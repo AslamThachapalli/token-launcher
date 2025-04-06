@@ -1,0 +1,64 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: "Inter", sans-serif;
+}
+
+body {
+    background-color: #29202e;
+}
+
+input {
+    background-color: #503e5a;
+    border: 1px solid #0a0011;
+    border-radius: 5px;
+    padding: 10px;
+    color: #fff;
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    
+}
+
+input:focus {
+    outline: 1px solid #040007;
+}
+
+input::placeholder {
+    color: #86798d;
+}
+
+input[type="file"] {
+    border: 2px dashed #625f64;
+    border-radius: 5px;
+    padding: 10px;
+    text-align: center;
+}
+
+input[type="file"]::file-selector-button {
+    background-color: #503e5a;
+    border: 1px solid #9f9c9c;
+    border-radius: 5px;
+    padding: 10px;
+    color: #9f9c9c;
+    margin-right: 10px;
+    cursor: pointer;
+}
+
+button {
+    background-color: #503e5a;
+    border: 1px solid #dddbdb;
+    border-radius: 5px;
+    padding: 10px;
+    color: #dddbdb;
+    cursor: pointer;
+}
+
+button:hover {
+    background-color: #9784a5;
+}
+
+button:active {
+    background-color: #9376a8;
+}

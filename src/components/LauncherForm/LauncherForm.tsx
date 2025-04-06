@@ -13,7 +13,6 @@ import {
     TokenMetadata,
 } from "@solana/spl-token-metadata";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { Keypair, SystemProgram, Transaction } from "@solana/web3.js";
 import { PinataSDK } from "pinata";
 import { useState } from "react";
@@ -23,7 +22,9 @@ const pinata = new PinataSDK({
     pinataGateway: import.meta.env.VITE_PINATA_GATEWAY,
 });
 
-function App() {
+import "./LauncherForm.css";
+
+export function LauncherForm() {
     const [name, setName] = useState("");
     const [symbol, setSymbol] = useState("");
     const [decimals, setDecimals] = useState("");
@@ -80,10 +81,6 @@ function App() {
             return;
         }
 
-        if (!wallet.connected) {
-            return;
-        }
-
         if (!image) {
             alert("Please attach an image");
             return;
@@ -105,7 +102,9 @@ function App() {
             return;
         }
 
-        const metadataIpfsLink = await pinata.gateways.public.convert(metadataCid);
+        const metadataIpfsLink = await pinata.gateways.public.convert(
+            metadataCid
+        );
 
         console.log("metadata ipfs link: " + metadataIpfsLink);
 
@@ -171,61 +170,64 @@ function App() {
     };
 
     return (
-        <div
-            style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "10px",
-                justifyContent: "center",
-                alignItems: "center",
-                height: "100vh",
-                width: "100vw",
-            }}
-        >
-            <div
-                style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "10px",
-                }}
-            >
-                <WalletMultiButton />
+        <div className="launcher-form-container">
+            <div className="launcher-form-header">
+                <h1>Solana Token Launcher</h1>
+                <p>Easily create your own Solana SPL Token without coding</p>
+            </div>
+            <div className="launcher-form">
+                <div className="launcher-form-input-grid">
+                    <input
+                        className="launcher-form-input-grid-item"
+                        type="text"
+                        placeholder="Name"
+                        maxLength={32}
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                    />
+                    <input
+                        className="launcher-form-input-grid-item"
+                        type="text"
+                        placeholder="Symbol"
+                        maxLength={8}
+                        value={symbol}
+                        onChange={(e) => setSymbol(e.target.value)}
+                    />
+                </div>
+                <div className="launcher-form-input-grid">
+                    <input
+                        className="launcher-form-input-grid-item"
+                        type="number"
+                        placeholder="Decimals"
+                        value={decimals}
+                        onChange={(e) => {
+                            const value = parseInt(e.target.value);
+                            if (value >= 1 && value <= 9) {
+                                setDecimals(e.target.value);
+                            }
+                        }}
+                    />
+                    <input
+                        className="launcher-form-input-grid-item"
+                        type="text"
+                        placeholder="Description"
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                    />
+                </div>
                 <input
-                    type="text"
-                    placeholder="Name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                />
-                <input
-                    type="text"
-                    placeholder="Symbol"
-                    value={symbol}
-                    onChange={(e) => setSymbol(e.target.value)}
-                />
-                <input
-                    type="text"
-                    placeholder="Decimals"
-                    value={decimals}
-                    onChange={(e) => setDecimals(e.target.value)}
-                />
-                <input
-                    type="text"
-                    placeholder="Description"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                />
-                <input
+                    className="launcher-form-input-image"
                     type="file"
                     accept="image/*"
                     placeholder="Attach image"
                     onChange={handleImageInputChange}
                 />
-            </div>
-            <div>
-                <button onClick={handleCreateToken}>Create Token</button>
+                <button
+                    onClick={wallet.connected ? handleCreateToken : () => {}}
+                >
+                    {wallet.connected ? "Create Token" : "Connect Wallet"}
+                </button>
             </div>
         </div>
     );
 }
-
-export default App;
