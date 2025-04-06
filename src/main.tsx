@@ -5,6 +5,7 @@ import {
     WalletProvider,
 } from "@solana/wallet-adapter-react";
 import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
+import { Toaster } from "sonner";
 
 import { App } from "./App";
 
@@ -20,6 +21,7 @@ createRoot(document.getElementById("root")!).render(
         >
             <WalletProvider wallets={[]} autoConnect>
                 <WalletModalProvider>
+                    <Toaster expand/>
                     <App />
                 </WalletModalProvider>
             </WalletProvider>

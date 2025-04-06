@@ -17,9 +17,11 @@
     "@solana/wallet-adapter-react-ui": "^0.9.36",
     "@solana/wallet-adapter-wallets": "^0.19.33",
     "@solana/web3.js": "^1.98.0",
+    "lucide-react": "^0.487.0",
     "pinata": "^2.2.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "sonner": "^2.0.3"
   },
   "devDependencies": {
     "@eslint/js": "^9.21.0",

@@ -16,6 +16,7 @@ import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { Keypair, SystemProgram, Transaction } from "@solana/web3.js";
 import { PinataSDK } from "pinata";
 import { useState } from "react";
+import { toast } from "sonner";
 
 const pinata = new PinataSDK({
     pinataJwt: import.meta.env.VITE_PINATA_JWT,
@@ -23,99 +24,150 @@ const pinata = new PinataSDK({
 });
 
 import "./LauncherForm.css";
+import { TokenInfo } from "../TokenInfo/TokenInfo";
 
 export function LauncherForm() {
-    const [name, setName] = useState("");
-    const [symbol, setSymbol] = useState("");
-    const [decimals, setDecimals] = useState("");
-    const [description, setDescription] = useState("");
-    const [image, setImage] = useState<File | null>(null);
+    const [formData, setFormData] = useState({
+        name: "",
+        symbol: "",
+        decimals: "",
+        description: "",
+        image: null as File | null,
+    });
+    const [isCreating, setIsCreating] = useState(false);
 
     const wallet = useWallet();
     const { connection } = useConnection();
 
-    const handleImageInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files.length > 0) {
-            setImage(e.target.files[0]);
+    const validateForm = () => {
+        if (!formData.name.trim()) {
+            toast.error("Token name is required");
+            return false;
         }
+        if (!formData.symbol.trim()) {
+            toast.error("Token symbol is required");
+            return false;
+        }
+        if (!formData.decimals) {
+            toast.error("Decimals value is required");
+            return false;
+        }
+        if (!formData.description.trim()) {
+            toast.error("Token description is required");
+            return false;
+        }
+        if (!formData.image) {
+            toast.error("Token image is required");
+            return false;
+        }
+        if (formData.image.size > 5 * 1024 * 1024) {
+            // 5MB limit
+            toast.error("Image size should be less than 5MB");
+            return false;
+        }
+        return true;
     };
 
-    const uploadImage = async (file: File): Promise<string | undefined> => {
-        try {
-            const upload = await pinata.upload.public.file(file);
-            return upload.cid;
-        } catch (error) {
-            console.error(error);
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { name, value, type, files } = e.target;
+
+        if (type === "file" && files) {
+            const file = files[0];
+            if (!file.type.startsWith("image/")) {
+                toast.error("Please upload an image file");
+                return;
+            }
+            if (file.size > 5 * 1024 * 1024) {
+                toast.error("Image size should be less than 5MB");
+                return;
+            }
+            setFormData((prev) => ({
+                ...prev,
+                image: file,
+            }));
             return;
         }
+
+        if (name === "decimals") {
+            const numValue = parseInt(value);
+            if (value && (isNaN(numValue) || numValue < 1 || numValue > 9)) {
+                toast.error("Decimals must be between 1 and 9");
+                return;
+            }
+            setFormData((prev) => ({
+                ...prev,
+                [name]: value,
+            }));
+            return;
+        }
+
+        if (name === "symbol" && value.length > 8) {
+            toast.error("Symbol cannot exceed 8 characters");
+            return;
+        }
+
+        if (name === "name" && value.length > 32) {
+            toast.error("Name cannot exceed 32 characters");
+            return;
+        }
+
+        setFormData((prev) => ({
+            ...prev,
+            [name]: value,
+        }));
     };
 
-    const uploadMetadata = async (imageUrl: string) => {
+    const uploadToIpfs = async (
+        data: any,
+        type: "file" | "json"
+    ): Promise<string> => {
+        const loadingId = toast.loading(`Uploading ${type} to IPFS...`);
         try {
-            const metadata = {
-                name,
-                symbol,
-                description,
-                image: imageUrl,
-                attributes: [],
-                properties: {
-                    files: [
-                        {
-                            uri: imageUrl,
-                            type: "image/jpeg",
-                        },
-                    ],
+            const upload =
+                type === "file"
+                    ? await pinata.upload.public.file(data)
+                    : await pinata.upload.public.json(data);
+
+            const ipfsLink = await pinata.gateways.public.convert(upload.cid);
+            toast.success(`Successfully uploaded ${type} to IPFS`, {
+                id: loadingId,
+            });
+            return ipfsLink;
+        } catch (error) {
+            console.error(`Failed to upload ${type}:`, error);
+            toast.error(`Failed to upload ${type} to IPFS`, {
+                id: loadingId,
+            });
+            throw new Error(`Failed to upload ${type}`);
+        }
+    };
+
+    const createMetadata = (imageUrl: string) => ({
+        name: formData.name.trim(),
+        symbol: formData.symbol.trim(),
+        description: formData.description.trim(),
+        image: imageUrl,
+        attributes: [],
+        properties: {
+            files: [
+                {
+                    uri: imageUrl,
+                    type: formData.image?.type || "image/jpeg",
                 },
-            };
+            ],
+        },
+    });
 
-            const upload = await pinata.upload.public.json(metadata);
-            return upload.cid;
-        } catch (error) {
-            console.error(error);
-            return;
-        }
-    };
-
-    const handleCreateToken = async () => {
-        if (!wallet.connected) {
-            return;
-        }
-
-        if (!image) {
-            alert("Please attach an image");
-            return;
-        }
-
-        const cid = await uploadImage(image);
-
-        if (!cid) {
-            alert("Failed to upload image");
-            return;
-        }
-
-        const imageIpfsLink = await pinata.gateways.public.convert(cid);
-
-        const metadataCid = await uploadMetadata(imageIpfsLink);
-
-        if (!metadataCid) {
-            alert("Failed to upload metadata");
-            return;
-        }
-
-        const metadataIpfsLink = await pinata.gateways.public.convert(
-            metadataCid
-        );
-
-        console.log("metadata ipfs link: " + metadataIpfsLink);
-
-        const mintKeypair = Keypair.generate();
-
+    const buildTransaction = async (
+        mintKeypair: Keypair,
+        metadataIpfsLink: string
+    ): Promise<Transaction> => {
         const metadata: TokenMetadata = {
             mint: mintKeypair.publicKey,
-            name: name,
-            symbol: symbol,
+            name: formData.name.trim(),
+            symbol: formData.symbol.trim(),
             uri: metadataIpfsLink,
-            additionalMetadata: [["description", description]],
+            additionalMetadata: [["description", formData.description.trim()]],
         };
 
         const mintLen = getMintLen([ExtensionType.MetadataPointer]);
@@ -125,7 +177,7 @@ export function LauncherForm() {
             mintLen + metadataLen
         );
 
-        const transaction = new Transaction().add(
+        return new Transaction().add(
             SystemProgram.createAccount({
                 fromPubkey: wallet.publicKey!,
                 newAccountPubkey: mintKeypair.publicKey,
@@ -141,7 +193,7 @@ export function LauncherForm() {
             ),
             createInitializeMint2Instruction(
                 mintKeypair.publicKey,
-                Number(decimals),
+                Number(formData.decimals),
                 wallet.publicKey!,
                 null,
                 TOKEN_2022_PROGRAM_ID
@@ -150,23 +202,75 @@ export function LauncherForm() {
                 programId: TOKEN_2022_PROGRAM_ID,
                 mint: mintKeypair.publicKey,
                 metadata: mintKeypair.publicKey,
-                name,
-                symbol,
+                name: formData.name.trim(),
+                symbol: formData.symbol.trim(),
                 uri: metadataIpfsLink,
                 mintAuthority: wallet.publicKey!,
                 updateAuthority: wallet.publicKey!,
             })
         );
+    };
 
-        transaction.feePayer = wallet.publicKey!;
-        transaction.recentBlockhash = (
-            await connection.getLatestBlockhash()
-        ).blockhash;
-        transaction.partialSign(mintKeypair);
+    const handleCreateToken = async () => {
+        if (!wallet.connected) {
+            toast.error("Please connect your wallet first");
+            return;
+        }
 
-        const txHash = await wallet.sendTransaction(transaction, connection);
-        console.log("mint address: " + mintKeypair.publicKey.toBase58());
-        console.log("tx hash: " + txHash);
+        if (!validateForm()) return;
+
+        setIsCreating(true);
+        const loadingId = toast.loading("Creating your token...");
+        try {
+            const imageIpfsLink = await uploadToIpfs(formData.image, "file");
+            const metadata = createMetadata(imageIpfsLink);
+            const metadataIpfsLink = await uploadToIpfs(metadata, "json");
+
+            const mintKeypair = Keypair.generate();
+            const transaction = await buildTransaction(
+                mintKeypair,
+                metadataIpfsLink
+            );
+
+            transaction.feePayer = wallet.publicKey!;
+            transaction.recentBlockhash = (
+                await connection.getLatestBlockhash()
+            ).blockhash;
+            transaction.partialSign(mintKeypair);
+
+            const txHash = await wallet.sendTransaction(
+                transaction,
+                connection
+            );
+
+            toast.success(
+                <TokenInfo
+                    mint={mintKeypair.publicKey.toBase58()}
+                    txHash={txHash}
+                />,
+                {
+                    id: loadingId,
+                    duration: 60000,
+                    closeButton: true,
+                }
+            );
+
+            // Reset form after successful creation
+            setFormData({
+                name: "",
+                symbol: "",
+                decimals: "",
+                description: "",
+                image: null,
+            });
+        } catch (error) {
+            console.error("Token creation failed:", error);
+            toast.error("Failed to create token. Please try again.", {
+                id: loadingId,
+            });
+        } finally {
+            setIsCreating(false);
+        }
     };
 
     return (
@@ -180,50 +284,58 @@ export function LauncherForm() {
                     <input
                         className="launcher-form-input-grid-item"
                         type="text"
+                        name="name"
                         placeholder="Name"
                         maxLength={32}
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
+                        value={formData.name}
+                        onChange={handleInputChange}
+                        required
                     />
                     <input
                         className="launcher-form-input-grid-item"
                         type="text"
+                        name="symbol"
                         placeholder="Symbol"
                         maxLength={8}
-                        value={symbol}
-                        onChange={(e) => setSymbol(e.target.value)}
+                        value={formData.symbol}
+                        onChange={handleInputChange}
+                        required
                     />
                 </div>
                 <div className="launcher-form-input-grid">
                     <input
                         className="launcher-form-input-grid-item"
                         type="number"
+                        name="decimals"
                         placeholder="Decimals"
-                        value={decimals}
-                        onChange={(e) => {
-                            const value = parseInt(e.target.value);
-                            if (value >= 1 && value <= 9) {
-                                setDecimals(e.target.value);
-                            }
-                        }}
+                        value={formData.decimals}
+                        onChange={handleInputChange}
+                        min="1"
+                        max="9"
+                        required
                     />
                     <input
                         className="launcher-form-input-grid-item"
                         type="text"
+                        name="description"
                         placeholder="Description"
-                        value={description}
-                        onChange={(e) => setDescription(e.target.value)}
+                        value={formData.description}
+                        onChange={handleInputChange}
+                        required
                     />
                 </div>
                 <input
                     className="launcher-form-input-image"
                     type="file"
+                    name="image"
                     accept="image/*"
                     placeholder="Attach image"
-                    onChange={handleImageInputChange}
+                    onChange={handleInputChange}
+                    required
                 />
                 <button
-                    onClick={wallet.connected ? handleCreateToken : () => {}}
+                    onClick={handleCreateToken}
+                    disabled={!wallet.connected || isCreating}
                 >
                     {wallet.connected ? "Create Token" : "Connect Wallet"}
                 </button>

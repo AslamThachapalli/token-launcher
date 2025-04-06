@@ -4,7 +4,10 @@ import "./Header.css";
 export function Header() {
     return (
         <div className="header">
-            <h1>Solana Token Launcher</h1>
+            <div className="header-title">
+                <h1>Solana Token Launcher</h1>
+                <div className="header-title-network">Devnet</div>
+            </div>
             <WalletMultiButton />
         </div>
     );

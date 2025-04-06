@@ -7,6 +7,25 @@
     border-bottom: 1px solid #0a0011;
 }
 
+.header-title {
+    display: flex;
+    align-items: end;
+    justify-content: center;
+    gap: 10px;
+}
+
+.header-title-network {
+    font-size: 14px;
+    font-weight: 400;
+    color: #fff;
+    letter-spacing: 0.08em;
+    font-style: italic;
+    border: 0.5px solid #fff;
+    border-radius: 5px;
+    padding: 1px 4px;
+    margin-bottom: 1px;
+}
+
 .header h1 {
     font-size: 24px;
     font-weight: 600;
